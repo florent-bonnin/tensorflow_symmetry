@@ -1,9 +1,9 @@
 import pathlib
 import random
 
-# modes available : normal, trap, noisy
-MODE = "noisy"
-NOISE = 0.01
+# modes available : normal, trap, noisy, all_random
+MODE = "all_random"
+NOISE = 1.00
 
 def get_random_sequence(nb_bits):
     sequence = ""
@@ -38,13 +38,17 @@ def get_trap_sequence(nb_bits, symmetrical_sequence):
     return sequence
 
 def add_noise(sequence, noise):
+    mask = [True] * len(sequence)
     for i in range(noise):
         j = random.randint(0, len(sequence) - 1)
-        bit = sequence[j]
-        bit = int(bit)
-        bit = 1 - bit
-        bit = str(bit)
-        sequence = sequence[:j] + bit + sequence[j+1:]
+        while mask[j] == False:
+            j = random.randint(0, len(sequence) - 1)
+        mask[j] = False
+    sequence = list(sequence)
+    for i in range(len(sequence)):
+        if mask[i] == False:
+            sequence[i] = str(random.randint(0, 1))
+    sequence = "".join(sequence)
     return sequence
 
 def is_symmetrical(sequence):
@@ -66,6 +70,12 @@ def is_symmetrical(sequence):
             k = (k - 1) if k > 0 else len(sequence) - 1
             l = (l + 1) % len(sequence)
     return False
+
+#symmetrical_sequence = get_symmetrical_sequence(100)
+#print("symmetrical:\t" + symmetrical_sequence)
+#noisy_sequence = add_noise(symmetrical_sequence, 100)
+#print("noisy:\t\t" + noisy_sequence)
+#exit()
 
 print("nb_bits = ", end="")
 nb_bits = int(input())
@@ -90,6 +100,8 @@ with open(file_name, "w", encoding="utf-8") as file:
             if MODE == "noisy":
                 symmetrical_sequence = get_symmetrical_sequence(nb_bits)
                 example = add_noise(symmetrical_sequence, noise)
+            elif MODE == "all_random":
+                example = get_random_sequence(nb_bits)
             else:
                 example = get_symmetrical_sequence(nb_bits)
             example += ",1"

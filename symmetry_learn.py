@@ -1,11 +1,12 @@
 import keras
 import matplotlib.pyplot as plt
 import pathlib
+import shutil
 import tensorflow as tf
 
 TRAIN_RATIO = 0.8
 BATCH_SIZE = 1
-NN_WIDTH = 1
+NN_WIDTH = 2
 FREEZE = False
 
 print("nb_bits = ", end="")
@@ -18,19 +19,22 @@ nb_epochs = int(input())
 nn_width = int(nb_bits * NN_WIDTH)
 print("nn_width = " + str(nn_width))
 
+########## DEBUT PREPARATION DU DATASET ##########
 file_name = "datasets/symmetry_" + str(nb_bits) + "_" + str(nb_examples) + ".csv"
 
 dataset = tf.data.experimental.make_csv_dataset(
     file_pattern=file_name,
     batch_size=32,
     column_names=["bits", "label"],
-    column_defaults=[
-        tf.constant("", dtype=tf.string),
-        tf.constant(0, dtype=tf.int32),
-    ],
+    column_defaults=[tf.string, tf.int32],
     label_name="label",
     header=False,
     num_epochs=1,
+    ########## ATTENTION
+    ########## ENORME PIEGE
+    ########## CETTE LIGNE EST INDISPENSABLE
+    ########## SINON FUITE DE DONNEE
+    shuffle=False,
 )
 
 dataset = dataset.map(lambda x, y: (x["bits"], y))
@@ -61,6 +65,7 @@ train_dataset = train_dataset.shuffle(buffer_size=train_size, seed=42, reshuffle
 train_dataset = train_dataset.batch(BATCH_SIZE)
 validation_dataset = validation_dataset.batch(BATCH_SIZE)
 test_dataset = test_dataset.batch(BATCH_SIZE)
+########## FIN PREPARATION DU DATASET ##########
 
 layers = [
     keras.Input(shape=(nb_bits,)),
@@ -103,7 +108,12 @@ callbacks = [
         verbose=1,
         restore_best_weights=True,
     ),
+#    keras.callbacks.TensorBoard(
+#        log_dir="tensorboard",
+#    ),
 ]
+
+shutil.rmtree("tensorboard", ignore_errors=True)
 
 history = model.fit(
     x=train_dataset,
