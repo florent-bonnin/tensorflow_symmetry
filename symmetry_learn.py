@@ -11,7 +11,7 @@ TRAIN_RATIO = 0.8
 BATCH_SIZE = 32
 NN_WIDTH = 1
 NN_DEPTH = 9
-L2 = 0.0000
+L2 = 0.0000001
 FREEZE = False
 
 print("nb_bits = ", end="")
@@ -72,6 +72,7 @@ validation_dataset = validation_dataset.batch(BATCH_SIZE)
 test_dataset = test_dataset.batch(BATCH_SIZE)
 ########## FIN PREPARATION DU DATASET ##########
 
+########## CUSTOM LAYERS ##########
 class AugmentationLayer(keras.layers.Layer):
 
     def call(self, inputs, training=None):
@@ -85,6 +86,35 @@ class AugmentationLayer(keras.layers.Layer):
             maxval=nb_bits,
         )
         return keras.ops.roll(x=inputs, shift=shift, axis=-1)
+
+class AdvancedLayer(keras.layers.Layer):
+
+    def __init__(self, units, l2, **kwargs):
+        super().__init__(**kwargs)
+        self.dense_1 = keras.layers.Dense(units=units, activation="relu", kernel_regularizer=keras.regularizers.L2(l2=l2))
+        self.dense_2 = keras.layers.Dense(units=1, activation="sigmoid")
+
+    def build(self, input_shape):
+        self.nb_bits = input_shape[-1]
+
+    def call(self, inputs):
+        l = []
+        for i in range(self.nb_bits):
+            x = self.dense_1(inputs)
+            x = self.dense_2(x)
+            l.append(x)
+            inputs = keras.ops.roll(x=inputs, shift=1, axis=-1)
+        x = keras.ops.stack(x=l, axis=-1)
+        x = keras.ops.max(x=x, axis=-1)
+        return x
+####################
+
+#TORM
+#layer = AdvancedLayer(units=100)
+#x = keras.ops.ones((4, 10))
+#x = layer(x)
+#print(x)
+#exit()
 
 layers = [
     keras.Input(shape=(nb_bits,)),
@@ -111,6 +141,16 @@ outputs = keras.layers.Dense(units=1, activation="sigmoid")(x)
 deep_model = keras.Model(inputs=inputs, outputs=outputs)
 keras.utils.plot_model(model=deep_model, to_file="results/deep_model.png", show_shapes=True)
 #model = deep_model
+####################
+
+########## ADVANCED MODEL ##########
+# l2 doit être très faible
+l2 = 0.0000001
+advanced_model = keras.Sequential([
+    keras.Input(shape=(nb_bits,)),
+    AdvancedLayer(units=nn_width, l2=l2),
+])
+model = advanced_model
 ####################
 
 model.summary()

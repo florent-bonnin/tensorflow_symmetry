@@ -2,7 +2,7 @@ import pathlib
 import random
 
 # modes available : normal, trap, noisy, all_random, easy
-MODE = "easy"
+MODE = "noisy"
 NOISE = 0.01
 ROTATION = 0
 
