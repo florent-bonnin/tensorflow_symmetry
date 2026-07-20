@@ -1,3 +1,6 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
+
 import keras
 import matplotlib.pyplot as plt
 import pathlib
@@ -5,8 +8,10 @@ import shutil
 import tensorflow as tf
 
 TRAIN_RATIO = 0.8
-BATCH_SIZE = 1
-NN_WIDTH = 2
+BATCH_SIZE = 32
+NN_WIDTH = 1
+NN_DEPTH = 9
+L2 = 0.0000
 FREEZE = False
 
 print("nb_bits = ", end="")
@@ -67,19 +72,53 @@ validation_dataset = validation_dataset.batch(BATCH_SIZE)
 test_dataset = test_dataset.batch(BATCH_SIZE)
 ########## FIN PREPARATION DU DATASET ##########
 
+class AugmentationLayer(keras.layers.Layer):
+
+    def call(self, inputs, training=None):
+        if not training:
+            return inputs
+        shape = keras.ops.shape(inputs)
+        nb_bits = shape[-1]
+        shift = keras.random.randint(
+            shape=(),
+            minval=0,
+            maxval=nb_bits,
+        )
+        return keras.ops.roll(x=inputs, shift=shift, axis=-1)
+
 layers = [
     keras.Input(shape=(nb_bits,)),
-    keras.layers.Dense(units=nn_width, activation="relu"),
+    #AugmentationLayer(),
+    keras.layers.Dense(units=nn_width, activation="relu", kernel_regularizer=keras.regularizers.L2(l2=L2)),
+    #keras.layers.Dense(units=nn_width, activation="relu"),
+    #keras.layers.Dropout(0.1),
+    #keras.layers.Dense(units=nn_width, activation="relu", kernel_regularizer=keras.regularizers.L2(l2=L2)),
     keras.layers.Dense(units=1, activation="sigmoid"),
 ]
 
 model = keras.Sequential(layers)
+
+########## DEEP MODEL ##########
+inputs = keras.Input(shape=(nb_bits,))
+x = inputs
+x = AugmentationLayer()(x)
+x = keras.layers.Dense(units=nn_width, activation="relu", kernel_regularizer=keras.regularizers.L2(l2=L2))(x)
+for i in range(NN_DEPTH):
+    x = keras.layers.Concatenate()([inputs, x])
+    x = keras.layers.Dense(units=nn_width, activation="relu", kernel_regularizer=keras.regularizers.L2(l2=L2))(x)
+    x = keras.layers.Dropout(0.2)(x)
+outputs = keras.layers.Dense(units=1, activation="sigmoid")(x)
+deep_model = keras.Model(inputs=inputs, outputs=outputs)
+keras.utils.plot_model(model=deep_model, to_file="results/deep_model.png", show_shapes=True)
+#model = deep_model
+####################
 
 model.summary()
 
 model.compile(
     optimizer="adam",
     loss=keras.losses.BinaryCrossentropy(from_logits=False),
+    #loss=keras.losses.BinaryFocalCrossentropy(from_logits=False),
     metrics=[
         "accuracy",
     ],
